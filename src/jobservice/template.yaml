@@ -1,0 +1,125 @@
+# This is the SAM template that represents the architecture of your serverless application
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
+
+# The AWSTemplateFormatVersion identifies the capabilities of the template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/format-version-structure.html
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Amenic scheduled tasks
+
+# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        AMENIC_MODE: release
+        DB_PROD: mongodb+srv://admin:HPgNbJ3aZAWVTAHJ@cluster0-2uphl.mongodb.net/amenic-prod?retryWrites=true&w=majority
+        DB_DEV: mongodb+srv://admin:HPgNbJ3aZAWVTAHJ@cluster0-2uphl.mongodb.net/amenic-dev?retryWrites=true&w=majority
+        FCM_AUTH_KEY: AAAAdRWjO1o:APA91bHSek_Nm6O-fg1hfYKxPEHIDByi4D1jUVrh0FCDph7qAIjvZQAzIHREZpdpv6vRz-4HLObBOuIVVjtH2i1UMNlYMoO6zzKGRiA5tN6JzYtZ3OgNXfj11ALj1p9lxs9Ks0qq_6vE
+        TMDB_API_KEY: 656e33ec4655db96281a85621198def7
+        STATIC_BUCKET_NAME: amenic-static
+        CLOUDINARY_URL: cloudinary://649342348956991:KunmyL9eIQH_HU-2BqhByPR3nYs@dyrib46is
+
+# Resources declares the AWS resources that you want to include in the stack
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+Resources:
+  # This is an SQS queue with all default configuration properties. To learn more about the available options, see
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
+  SimpleQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: AmenicJobQueue
+      VisibilityTimeout: 60
+
+  AmenicJobs:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: main
+      CodeUri: main.zip
+      Runtime: go1.x
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AmazonS3FullAccess
+      Timeout: 60
+      Events:
+        CreateStatic:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3 * * ? *) # 00:00 in America/Sao_Paulo which is GMT-3
+            Input: >
+              {
+                "name": "create_static",
+                "args": [
+                  "-type", "home"
+                ]
+              }
+            Enabled: True
+
+        CheckOpeningMovies:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 16 ? * THU *) # 13:00 in America/Sao_Paulo which is GMT-3
+            Input: '{ "name": "check_opening_movies" }'
+            Enabled: True
+
+        SyncScores:
+          Type: Schedule
+          Properties:
+            Schedule: rate(12 hours)
+            Input: '{ "name": "sync_scores" }'
+            Enabled: True
+
+        DailyScrapers:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3,10,15 * * ? *) # 00:00,07:00,12:00 in America/Sao_Paulo which is GMT-3
+            Input: >
+              {
+                "name": "start_scraper",
+                "args": [
+                  "-type", "now_playing,schedule",
+                  "-ignore_last_run", "true"
+                ]
+              }
+            Enabled: True
+
+        PricesAndUpcomingScrapers:
+          Type: Schedule
+          Properties:
+            Schedule: rate(7 days)
+            Input: >
+              {
+                "name": "start_scraper",
+                "args": [
+                  "-type", "upcoming,prices",
+                  "-ignore_last_run", "true"
+                ]
+              }
+            Enabled: True
+
+        UploadImagesToCloudinary:
+          Type: Schedule
+          Properties:
+            Schedule: rate(7 days)
+            Input: '{ "name": "upload_images_to_cloudinary" }'
+            Enabled: True
+
+  AmenicWorker:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: worker
+      CodeUri: worker.zip
+      Runtime: go1.x
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AmazonSQSFullAccess
+        - AmazonS3FullAccess
+      Timeout: 60
+      Events:
+        SimpleSQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SimpleQueue.Arn
+            BatchSize: 10

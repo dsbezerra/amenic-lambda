@@ -1,0 +1,58 @@
+{
+  "Records": [
+    {
+      "messageId": "19dd0b57-b21e-4ac1-bd88-01bbb068cb78",
+      "receiptHandle": "MessageReceiptHandle",
+      "body": "Hello from SQS!",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1523232000000",
+        "SenderId": "012345678910",
+        "ApproximateFirstReceiveTimestamp": "1523232000001"
+      },
+      "messageAttributes": {
+        "Job": {
+          "DataType": "String",
+          "StringValue": "start_scraper"
+        },
+        "Type": {
+          "DataType": "String",
+          "StringValue": "prices"
+        },
+        "IgnoreLastRun": {
+          "DataType": "String",
+          "StringValue": "1"
+        }
+      },
+      "md5OfBody": "7b270e59b47ff90a553787216d55d91d",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:sa-east-1:012345678910:AmenicJobQueue",
+      "awsRegion": "sa-east-1"
+    },
+    {
+      "messageId": "19dd0b57-b21e-4ac1-bd88-01bbb068cb78",
+      "receiptHandle": "MessageReceiptHandle",
+      "body": "Hello from SQS!",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1523232000000",
+        "SenderId": "012345678910",
+        "ApproximateFirstReceiveTimestamp": "1523232000001"
+      },
+      "messageAttributes": {
+        "Job": {
+          "DataType": "String",
+          "StringValue": "create_static"
+        },
+        "Type": {
+          "DataType": "String",
+          "StringValue": "home"
+        }
+      },
+      "md5OfBody": "7b270e59b47ff90a553787216d55d91d",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:sa-east-1:012345678910:AmenicJobQueue",
+      "awsRegion": "sa-east-1"
+    }
+  ]
+}

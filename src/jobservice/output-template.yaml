@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Amenic scheduled tasks
+Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Environment:
+      Variables:
+        AMENIC_MODE: release
+        DB_PROD: mongodb+srv://admin:HPgNbJ3aZAWVTAHJ@cluster0-2uphl.mongodb.net/amenic-prod?retryWrites=true&w=majority
+        DB_DEV: mongodb+srv://admin:HPgNbJ3aZAWVTAHJ@cluster0-2uphl.mongodb.net/amenic-dev?retryWrites=true&w=majority
+        FCM_AUTH_KEY: AAAAdRWjO1o:APA91bHSek_Nm6O-fg1hfYKxPEHIDByi4D1jUVrh0FCDph7qAIjvZQAzIHREZpdpv6vRz-4HLObBOuIVVjtH2i1UMNlYMoO6zzKGRiA5tN6JzYtZ3OgNXfj11ALj1p9lxs9Ks0qq_6vE
+        TMDB_API_KEY: 656e33ec4655db96281a85621198def7
+        STATIC_BUCKET_NAME: amenic-static
+        CLOUDINARY_URL: cloudinary://649342348956991:KunmyL9eIQH_HU-2BqhByPR3nYs@dyrib46is
+Resources:
+  SimpleQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: AmenicJobQueue
+      VisibilityTimeout: 60
+  AmenicJobs:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: main
+      CodeUri: s3://amenic-zips/dda7ac7e7a07f5019eef4b7df820ef73
+      Runtime: go1.x
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - AmazonS3FullAccess
+      Timeout: 60
+      Events:
+        CreateStatic:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3 * * ? *)
+            Input: "{\n  \"name\": \"create_static\",\n  \"args\": [\n    \"-type\"\
+              , \"home\"\n  ]\n}\n"
+            Enabled: true
+        CheckOpeningMovies:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 16 ? * THU *)
+            Input: '{ "name": "check_opening_movies" }'
+            Enabled: true
+        SyncScores:
+          Type: Schedule
+          Properties:
+            Schedule: rate(12 hours)
+            Input: '{ "name": "sync_scores" }'
+            Enabled: true
+        DailyScrapers:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3,10,15 * * ? *)
+            Input: "{\n  \"name\": \"start_scraper\",\n  \"args\": [\n    \"-type\"\
+              , \"now_playing,schedule\",\n    \"-ignore_last_run\", \"true\"\n  ]\n\
+              }\n"
+            Enabled: true
+        PricesAndUpcomingScrapers:
+          Type: Schedule
+          Properties:
+            Schedule: rate(7 days)
+            Input: "{\n  \"name\": \"start_scraper\",\n  \"args\": [\n    \"-type\"\
+              , \"upcoming,prices\",\n    \"-ignore_last_run\", \"true\"\n  ]\n}\n"
+            Enabled: true
+        UploadImagesToCloudinary:
+          Type: Schedule
+          Properties:
+            Schedule: rate(7 days)
+            Input: '{ "name": "upload_images_to_cloudinary" }'
+            Enabled: true
+  AmenicWorker:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: worker
+      CodeUri: s3://amenic-zips/f8d5c571305b8691290bbe7b0f198fa8
+      Runtime: go1.x
+      Policies:
+      - AWSLambdaBasicExecutionRole
+      - AmazonSQSFullAccess
+      - AmazonS3FullAccess
+      Timeout: 60
+      Events:
+        SimpleSQSEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - SimpleQueue
+              - Arn
+            BatchSize: 10

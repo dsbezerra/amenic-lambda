@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Amenic Api
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        AMENIC_MODE: release
+        AWS_LAMBDA: True
+        DB_PROD: mongodb+srv://admin:HPgNbJ3aZAWVTAHJ@cluster0-2uphl.mongodb.net/amenic-prod?retryWrites=true&w=majority
+        DB_DEV: mongodb+srv://admin:HPgNbJ3aZAWVTAHJ@cluster0-2uphl.mongodb.net/amenic-dev?retryWrites=true&w=majority
+        JWT_SECRET: JaS43nZAQrrM3dFfgBsdy4F5dUUcud8akrWpyyzpYVUxFAnB9GuYYRKJLu8FHNhb65S2AR2cdVSdjSS7GqMdqjR2FRyfkvJADX7JP5bjth2mbTPnEE7uz3VPNLM8HCyt
+        SETUP_DATABASE_AT_START: False
+        STATIC_BUCKET_NAME: amenic-static
+Resources:
+  AmenicApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: main
+      CodeUri: main.zip
+      Runtime: go1.x
+      MemorySize: 128
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AmazonS3ReadOnlyAccess
+      Timeout: 15
+      Events:
+        GetResource:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: any
+
+Outputs:
+  AmenicApi:
+    Description: URL for application
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod'
+    Export:
+      Name: AmenicApi
